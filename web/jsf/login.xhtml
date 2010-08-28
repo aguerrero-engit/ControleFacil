@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:c="http://java.sun.com/jsp/jstl/core"
+      xmlns:h="http://java.sun.com/jsf/html"
+      xmlns:f="http://java.sun.com/jsf/core"
+      xmlns:ui="http://java.sun.com/jsf/facelets">
+
+
+        <ui:composition template="./../templates/general.xhtml">
+
+            <ui:define name="content">
+                <div id="login_box">
+                    <h:form id="loginForm" prependId="false" style="padding-left: auto; padding-right: auto;" >
+                        <c:if test="#{param.access_denied == 1}">
+                            <h:outputText style="text-align: center; color: red;" value="#{err.badCredentials}" />
+                        </c:if>
+                        <h:panelGrid columns="2" style="margin-left: auto; margin-right: auto;" >
+                            <h:outputText value="#{lbl.user}:" />
+                            <h:inputText id="j_username" required="true" />
+                            <h:outputText value="#{lbl.password}:" />
+                            <h:inputSecret id="j_password" required="true" />
+                            <h:outputText value=" " />
+                            <h:commandButton type="submit" id="login" action="#{springLoginBean.loginAction}" value="Login" />
+                        </h:panelGrid>
+                    </h:form>
+                    <!-- h:messages / -->
+                </div>
+            </ui:define>
+        </ui:composition>
+
+</html>

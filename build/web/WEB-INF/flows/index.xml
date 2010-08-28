@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+    Document   : index.xml
+    Created on : August 17, 2010, 1:23 PM
+    Author     : Manuel Guerrero
+    Description:
+        XML describing the index flow, this is the main flow of the application,
+        from this one all other subflows are executed.
+-->
+
+<flow xmlns="http://www.springframework.org/schema/webflow"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/webflow
+		http://www.springframework.org/schema/webflow/spring-webflow-2.0.xsd" start-state="index">
+    
+    <view-state id="index">
+        <on-render>
+            <evaluate
+                expression="employeeService.findEmployeeById(currentUser.name)"
+                result="viewScope.employee" result-type="it.eng.controlefacil.mvc.model.entity.Employee" />
+            <evaluate
+                expression="employeeService.findAll()"
+                result="viewScope.employees" />
+        </on-render>
+        <transition on="nextStep" to="logout"/>
+        <transition on="adminIndex" to="adminIndex">
+            <secured attributes="ROLE_ADMIN" match="any" />
+        </transition>
+    </view-state>
+
+    <subflow-state id="adminIndex" subflow="adminIndex">
+        <transition on="backToIndex" to="index" />
+        <transition on="logout" to="logout" />
+    </subflow-state>
+    
+    <end-state id="logout" view="externalRedirect:contextRelative:/j_spring_security_logout"/>
+</flow>

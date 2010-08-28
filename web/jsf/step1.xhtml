@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:ui="http://java.sun.com/jsf/facelets">
+    <body>
+
+        <ui:composition template="./../templates/general.xhtml">
+           <ui:define name="scripts">
+                <script type="text/javascript" src="#{facesContext.externalContext.requestContextPath}/jQuery/js/jquery-1.4.2.min.js"></script>
+                <script type="text/javascript" src="#{facesContext.externalContext.requestContextPath}/jQuery/js/jquery-ui-1.8.1.custom.min.js"></script>
+                <!-- script type="text/javascript" src="#{facesContext.externalContext.requestContextPath}/js/login.js"></script -->
+            </ui:define>
+
+            <ui:define name="content">
+                <a href="#{flowExecutionUrl}&amp;_eventId=nextStep">Next Step</a>
+            </ui:define>
+
+        </ui:composition>
+
+    </body>
+</html>

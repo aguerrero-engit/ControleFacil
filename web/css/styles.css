@@ -1,0 +1,89 @@
+html {
+	background-color: #000;
+}
+
+body {
+	margin: 10px;
+	font-family: "Trebuchet MS", arial, sans-serif;
+	color: #0F0;
+}
+
+#hd {
+	height: 136px;
+	padding-right: 245px;
+	background-image: url('banner.gif');
+	background-repeat: no-repeat;
+	background-position: right;
+	margin-bottom: 20px;
+	border-bottom: 2px dashed #0F0;
+	padding-bottom: 5px;
+}
+
+#ft {
+	text-align: right;
+	margin-top: 20px;
+	border-top: 2px dashed #0F0;
+	padding-top: 10px;
+}
+
+.banner {
+	margin-bottom: 20px;
+	font-family: monospace, courier, serif;
+	font-size: 182%;
+	font-weight: bold;
+}
+
+.page-title {
+	margin-bottom: 20px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	color: #0FF;
+}
+
+h1 {
+	text-transform: uppercase;
+	margin: 0;
+}
+
+h2 {
+	margin-bottom: 0;
+}
+
+a {
+	font-weight: bold;
+	color: #FF0;
+}
+
+table {
+	border: none;
+	width: 400px;
+}
+
+th, td {
+	border: none;
+	padding: 0 10px;
+	text-align: left;
+}
+
+th {
+	background-color: #0F0;
+	color: #000;
+}
+
+td.numeric, th.numeric {
+	text-align: right;
+}
+
+.product-thumb {
+	width: 75px;
+	height: 75px;
+}
+
+.form-field {
+	margin: 5px 0;
+}
+
+.submit-button {
+	margin-top: 20px;
+}

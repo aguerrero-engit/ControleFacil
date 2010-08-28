@@ -1,0 +1,376 @@
+__Notas sobre Spring 3, JSF 2.0, JavaEE 6 Web__
+Inicio del proyecto:
+
+Fácilmente se usa Facelets. En web.xml se configura fácilmente con:
+
+		<servlet>
+			<servlet-name>Faces Servlet</servlet-name>
+			<servlet-class>javax.faces.webapp.FacesServlet</servlet-class>
+			<load-on-startup>1</load-on-startup>
+		</servlet>
+		<servlet-mapping>
+			<servlet-name>Faces Servlet</servlet-name>
+			<url-pattern>/faces/*</url-pattern>
+		</servlet-mapping>
+
+Se crea un decorator Facelets que puede usar '#{facesContext.externalContext.requestContextPath}' entre otras variables siempre que se añada el namespace: 'xmlns:h="http://java.sun.com/jsf/html"' en el tag html. (recordemos que es XHTML).
+
+Las llamadas a '/App/faces/X/cosa.xhtml' buscarán un jsf en '/web/X/cosa.xhtml'
+
+Para cambiar el MVC a ViewFactory para usar el jsf:
+1) Se cambia el bean dispatcher para mapear los .do
+2) En el descriptor del servlet dispatcher (dispatcher-servlet.xml) se cambia:
+En el *viewResolver* cambiamos el p:prefix y p:suffix como sigue:
+    <bean id="viewResolver"
+          class="org.springframework.web.servlet.view.InternalResourceViewResolver"
+          p:prefix="/faces/jsf/"
+          p:suffix=".xhtml" />
+		  
+Y el *urlMapping*, que asocia una vista a un controller, por ejemplo así:
+    <bean id="urlMapping" class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping">
+        <property name="mappings">
+            <props>
+                <prop key="login.do">loginController</prop>
+            </props>
+        </property>
+    </bean>
+	
+Con esto el MVC ya trabaja con JSF/Facelets.
+
+_Añadir Spring Webflow_
+En primer lugar se deben añadir los .jar de 'binding', 'js' y 'webflow' del paquete de Spring Webflow.
+
+Después comenzamos con la configuración, modificando el descriptor dispatcher-servlet.xml:
+
+1) Hay que añadir el namespace 'flow'
+	xmlns:flow="http://www.springframework.org/schema/webflow-config"
+	xsi:schemaLocation añadir:
+		http://www.springframework.org/schema/webflow-config
+		http://www.springframework.org/schema/webflow-config/spring-webflow-config-2.0.xsd
+		
+2) Vamos a necesitar un viewFactoryCreator al que se le pasará como propiedad un viewResolver (el de MVC para JSF en este caso):
+	<bean id="viewFactoryCreator" class="org.springframework.webflow.mvc.builder.MvcViewFactoryCreator">
+        <property name="viewResolvers">
+            <list>
+                <ref bean="viewResolver"/>
+            </list>
+        </property>
+    </bean>
+	
+3) Después vamos a necesitar un flowBuilderServices que usará el viewFactoryCreator:
+	<flow:flow-builder-services id="flowBuilderServices" view-factory-creator="viewFactoryCreator"/>
+	
+4) También vamos a necesitar declarar un flowRegistry que usará el flowBuilderServices que acabamos de crear:
+    <flow:flow-registry id="flowRegistry" flow-builder-services="flowBuilderServices">
+        <flow:flow-location-pattern value="/WEB-INF/flows/*.xml" />
+    </flow:flow-registry>
+Este flowRegistry, va a considerar todos los *.xml dentro de /WEB-INF/flows/ como descriptores de flujo, usará el nombre lógico del view para buscar el descriptor del flujo en /WEB-INF/flows/ como ${logicView}.xml.
+
+5) Declararemos un flowExecutor, encargado de ejecutar los flujos:
+	<flow:flow-executor id="flowExecutor" flow-registry="flowRegistry" />
+Este flowExecutor usará el flowRegistry para saber que flujos podrá ejecutar (los que tengan un descriptor *válido* en /WEB-INF/flows, en este caso)
+
+6) Declaramos un flowController (estamos usando Spring MVC bajo Spring WebFlow), este flowController lo usaremos después en el urlMapping para indicar que nombres lógicos .do serán controlados por este controlador de SWF:
+    <bean id="flowController" class="org.springframework.webflow.mvc.servlet.FlowController">
+        <property name="flowExecutor" ref="flowExecutor"/>
+    </bean>
+Este flowController usará el flowExecutor para ejecutar los flujos.
+
+7) Cambiamos la propiedad del urlMapping para que gestione login.do con flowController:
+    <bean id="urlMapping" class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping">
+        <property name="mappings">
+            <props>
+                <prop key="login.do">flowController</prop>
+            </props>
+        </property>
+    </bean>
+
+_Crear un flujo básico_
+1) Creamos en el /WEB-INF/flows el descriptor de flujo login.xml (porque hemos mapeado login.do con el flowController, esto acabará buscando el archivo /WEB-INF/flows/login.xml:
+	<?xml version="1.0" encoding="UTF-8"?>
+
+	<flow xmlns="http://www.springframework.org/schema/webflow"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="http://www.springframework.org/schema/webflow
+			http://www.springframework.org/schema/webflow/spring-webflow-2.0.xsd" start-state="step1">
+		<view-state id="step1" view="step1">
+			<transition on="nextStep" to="step2"/>
+		</view-state>
+		<view-state id="step2" view="step2">
+			<transition on="goBack" to="step1" />
+			<transition on="nextStep" to="finish"/>
+		</view-state>
+		<end-state id="finish" />
+	</flow>
+	
+En este flujo tenemos tres estados, dos view-state y un end-state.
+En el tag "flow" tenemos una propiedad start-page que apunta al view-state con id "step1". El view-state "step1" buscará la vista con el nombre lógico step1, que acabará buscando el JSF /jsf/step1.xhtml.
+Este view-state step1 tiene declarada una transición posible, en caso _eventId = 'nextStep' irá al view-state "step2" que usará la vista con el nombre lógico step2.
+
+En los xhtml step1 y step2 se encuentra el jsf para estas páginas con links para pasar de un estado a otro.
+
+_Usar Spring Security 3.0.3_
+
+Primero debemos incluir los .jar del paquete Spring Security 3.0.3.
+También el jar de aopalliance.
+
+Después creamos un archivo de configuración: /WEB-INF/applicationContext-security.xml, con el contenido mínimo, después iremos añadiendo cosas:
+<?xml version="1.0" encoding="UTF-8"?>
+<beans:beans xmlns="http://www.springframework.org/schema/security"
+  xmlns:beans="http://www.springframework.org/schema/beans"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.springframework.org/schema/beans
+           http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+           http://www.springframework.org/schema/security
+           http://www.springframework.org/schema/security/spring-security-3.0.3.xsd">
+<!-- Aquí incluiremos la configuración -->
+</beans:beans>
+
+Hay que modificar también web.xml. Se añade el siguiente filtro:
+	<filter>
+        <filter-name>springSecurityFilterChain</filter-name>
+        <filter-class>
+            org.springframework.web.filter.DelegatingFilterProxy
+        </filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>springSecurityFilterChain</filter-name>
+        <url-pattern>/*</url-pattern>
+		<dispatcher>FORWARD</dispatcher>
+		<dispatcher>REQUEST</dispatcher>
+    </filter-mapping>
+
+También, como estamos utilizando JSF 2.0, tenemos que hacer un login y un bean que gestione el login, este bean únicamente capturará el request y lo enviará a servlet de Spring Security para que éste se encargue de logarse. El login puede ser perfectamente algo así (/jsf/login.xhtml):
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://java.sun.com/jsf/html"
+      xmlns:f="http://java.sun.com/jsf/core">
+    <f:view>
+        <h:form id="loginForm" prependId="false">
+            <h:panelGrid columns="2">
+                <f:facet name="header">
+                    <h:outputText value="Login page:"/>
+                </f:facet>
+                <h:outputText value="User:" />
+                <h:inputText id="j_username" required="true" value=""/>
+                <h:outputText value="Password:" />
+                <h:inputSecret id="j_password" required="true" />
+                <h:outputText value="Remember me" />
+                <h:selectBooleanCheckbox id="_spring_security_remember_me" />
+                <h:outputText value=" " />
+                <h:commandButton type="submit" id="login" action="#{springLoginBean.loginAction}" value="Login" />
+            </h:panelGrid>
+        </h:form>
+        <h:messages />
+    </f:view>
+</html>
+
+Se pueden ver varios campos de texto con ids utilizados en Spring Security: j_username, j_password y _spring_security_remember_me.
+También se puede apreciar que el botón submit, con id="login" tiene un action que ejecuta una acción del bean que gestiona el login, en este caso hace un forward simplemente. Veamos:
+
+@ManagedBean
+@Scope("request")
+public class SpringLoginBean {
+    private String user;
+    private String password;
+    private boolean storeUser = false;
+    private boolean logIn = false;
+
+	/* aquí van los getters y setters */
+
+    public String loginAction() throws IOException, ServletException {
+        ExternalContext context = FacesContext.getCurrentInstance().getExternalContext();
+
+        RequestDispatcher dispatcher = ((ServletRequest) context.getRequest()).getRequestDispatcher("/j_spring_security_check");
+        dispatcher.forward((ServletRequest) context.getRequest(), (ServletResponse) context.getResponse());
+
+        FacesContext.getCurrentInstance().responseComplete();
+        
+        return null;
+    }
+}
+
+Una vez hecho esto nos queda configurar el algunas cosas de Spring Security, en el applicationContext-security.xml que hemos creado antes. Vamos a ir añadiéndole cosas.
+Primero le activamos las anotaciones de seguridad, que las usaremos más adelante, añadiendo:
+	<global-method-security secured-annotations="enabled"></global-method-security>
+	
+Después vamos a preparar algunas reglas de acceso y establecer algunas vistas como el form del login, el del logout y el de acceso restringido:
+   <http auto-config="true" access-denied-page="/accessDenied.do">
+        <intercept-url pattern="/login.do*" access="IS_AUTHENTICATED_ANONYMOUSLY" />
+        <intercept-url pattern="/admin/*.do" access="ROLE_ADMIN" />
+        <intercept-url pattern="/**.do" access="ROLE_USER,ROLE_ADMIN" />
+
+        <form-login login-page="/login.do"
+            login-processing-url="/j_spring_security_check"
+            default-target-url="/test.do"
+            authentication-failure-url="/login.do?login_error=1" />
+    </http>
+
+La propiedad 'access-denied-page' dice a donde dirigir la navegación en caso de un intento de acceso negado. El tag form-login, establece la configuración del formulario del login, en este caso dice:
+ * login-page="/login.do" -> la vista del login es /login.do
+ * login-processing-url="/j_spring_security_check" -> cuando se procese el login, hay que usar esta dirección, que es la que luego se caputra en el bean que gestiona este login
+ * default-target-url="/test.do" -> cuando el login es OK, va a esta URL
+ * authentication-failure-url="/login.do?login_error=1" -> en caso de login KO, se va a esta URL
+ 
+ Otra cosa necesaria es tener un gestor de autentificaciones, que se encarga de relacionar usuario, password y niveles de acceso. Uno sencillo puede ser:
+     <authentication-manager>
+        <!-- user/spring -->
+        <authentication-provider>
+            <user-service>
+                <user name="user" password="pass" authorities="ROLE_USER, ROLE_ADMIN" />
+            </user-service>
+        </authentication-provider>
+    </authentication-manager>
+este authentication-manager usa passwords en texto plano e indica los authorities que el usuario 'user' tiene, con esos roles luego hemos creado algunas reglas a nivel de navegación (los intercept-url), pero también podremos usarlos para mostrar o no partes de vistas usando las anotaciones.
+
+_Configurando y poniéndo soporte i18n_
+Vamos a usar application.properties para poner la configuración general de la aplicación, como los datos para acceso a la base de datos, para ello vamos a poner el applicationContext.xml un PropertyPlaceholderConfigurer, del siguiente modo:
+    <bean id="propertyConfigurer"
+          class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer"
+          p:location="/properties/application.properties" />
+y crear el archivo /properties/application.properties.
+
+Con este configurador podemos crear un dataSource, por ejemplo, añadiendo en applicationContext.xml lo siguiente:
+    <bean id="dataSource"
+        class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+        <property name="driverClassName" value="${application.driverClassName}" />
+        <property name="url" value="${application.url}" />
+        <property name="username" value ="${application.username}" />
+        <property name="password" value="${application.password}" />
+    </bean>
+No nos olvidemos de tener el driver en el classpath.
+
+Para el i18n, usaremos otro tipo de configurador al que le pasaremos la raiz de los properties que usaremos, él mismo se encargará de añadir el lang (es-ES, pt-BR, etc...) o de buscar el property por defecto en caso de no encontrar el property específico para ese lang. Usaremos ReloadableResourceBundleMessageSource, así:
+    <bean id="baseMessageSource" class="org.springframework.context.support.ResourceBundleMessageSource">
+        <property name="basenames">
+            <list>
+                <value>/properties/errors</value>
+                <value>/properties/labels</value>
+            </list>
+        </property>
+    </bean>
+    <bean id="messageSource" class="org.springframework.context.support.ReloadableResourceBundleMessageSource">
+        <property name="basenames">
+            <list>
+                <value>/properties/errors</value>
+                <value>/properties/labels</value>
+            </list>
+        </property>
+        <property name="parentMessageSource">
+            <ref bean="baseMessageSource" />
+        </property>
+        <property name="cacheSeconds">
+            <value>1</value>
+        </property>
+    </bean>
+
+Son dos beans, que aún tengo que ver porque lo hice así.
+Deben existir, por lo menos: /properties/errors.properties y /properties/labels.properties
+
+Usando JSF 2.0 tenemos otra manera de hacerlo, también bastante interesante. En este caso se ponen los .properties dentro de la carpeta "src" para que se incluyan dentro del jar/war/ear. Por ejemplo en src/properties/. Después tenemos que crear el archivo de configuración /WEB-INF/faces-config.xml así:
+<?xml version="1.0" encoding="UTF-8"?>
+<faces-config xmlns="http://java.sun.com/xml/ns/javaee"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-facesconfig_2_0.xsd"
+              version="2.0">
+
+    <application>
+        <message-bundle>
+           properties.labels
+        </message-bundle>
+        <locale-config>
+            <default-locale>en</default-locale>
+            <supported-locale>pt-BR</supported-locale>
+        </locale-config>
+    </application>
+</faces-config>
+
+Después, desde el JSF se puede hacer:
+<f:loadBundle basename="properties.labels" var="msg"/>
+para asociar el el properties.labels a la variable JSF msg y para poder después hacer un #{msg['labels.user']} o un #{err.badCredentials}, para obtener el campo traducido según el locale del browser o configurado.
+Podemos poner tantos <message-bundle /> como necesitemos.
+
+Este enfoque da algún problema con los facelets, pero cambiando el message-bundle por:
+    <resource-bundle>
+        <base-name>properties.labels</base-name>
+        <var>lbl</var>
+    </resource-bundle>
+tenemos el mismo resultado usando facelets y además no es necesario usar el f:loadBundle.
+
+_Buscando los usuarios en una base de datos_
+Hemos configurado anteriormente el Spring Security 3.0.3 para hacer login, pero hasta ahora usábamos una serie user/pass/authorities escritas a piñón en el applicationContext-security.xml y con los passwords en texto plano. Para poder dar un poco más de seguridad y agilidad para crear/modificar/borrar usuarios, vamos a hacer que se busque la contraseña y los roles de cada usuario en unas tablas de usuarios y para dar un poco más de seguridad vamos a comparar hashes MD5 de la contraseña, así no mantenemos el passwd en texto claro en la base de datos. Para hacer esto necesitamos crear un bean user-service que obtenga los datos de la base de datos y cambiar el authentication-manager para que su authentication-provider use el bean user-service. así:
+    <authentication-manager>
+		<authentication-provider user-service-ref='myUserDetailsService'>
+            <password-encoder hash="md5"/>
+        </authentication-provider>
+    </authentication-manager>
+
+    <beans:bean id="myUserDetailsService" class="org.springframework.security.core.userdetails.jdbc.JdbcDaoImpl">
+        <beans:property name="dataSource" ref="dataSource"/>
+        <beans:property name="usersByUsernameQuery">
+            <beans:value>
+                 select "EMPL_ID", "PASSWORD", "ENABLED" from public."TEMPLOYEES" where upper("EMPL_ID")=upper(?)
+            </beans:value>
+        </beans:property>
+        <beans:property name="authoritiesByUsernameQuery">
+            <beans:value>
+                select "EMPL_ID", "AUTH_ID" from public."REMPL_AUTHORITIES" where upper("EMPL_ID")=upper(?)
+            </beans:value>
+        </beans:property>
+    </beans:bean>
+</beans:beans>
+
+"user-service-ref='myUserDetailsService'" del authentication-provider se refiere al bean myUserDetailsService, que usa un JdbcDaoImpl para obtener el usuario de una base de datos (en este caso postgresql) que usa también el dataSource definido en applicationContext.xml.
+
+Claro que hay que tener una estructura de tablas que tenga al menos una tabla TEMPLOYES y REMPL_AUTHORITIES con los campos de los selects.
+
+Configurar webflow para usar spring security, añadir en despatcher-servlet.xml:
+    
+    <bean id="securityFlowExecutionListener"
+        class="org.springframework.webflow.security.SecurityFlowExecutionListener" />
+
+    <flow:flow-executor id="flowExecutor" flow-registry="flowRegistry">
+        <flow:flow-execution-listeners>
+            <flow:listener ref="securityFlowExecutionListener" />
+        </flow:flow-execution-listeners>
+    </flow:flow-executor>
+
+_Añadiendo soporte JPA 2.0 e Hibernate_
+
+Se crea el xml de configuración de JPA "persistence.xml" en el dir src/java/META-INF, indicando el <provider />, en este caso "org.hibernate.ejb.HibernatePersistence", porque usaremos hibernate y algunas propiedades de configuración para hibernate:
+<persistence xmlns="http://java.sun.com/xml/ns/persistence"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://java.sun.com/xml/ns/persistence http://java.sun.com/xml/ns/persistence/persistence_2_0.xsd"
+ version="2.0">
+    <persistence-unit name="controleFacilPU">
+        <provider>org.hibernate.ejb.HibernatePersistence</provider>
+        <properties>
+            <property name="hibernate.hbm2ddl.auto" value="update" />
+            <property name="hibernate.show_sql" value="false" />
+            <property name="hibernate.dialect">org.hibernate.dialect.PostgreSQLDialect</property>
+            <property name="hibernate.connection.driver_class">org.postgresql.Driver</property>
+            <property name="hibernate.connection.url">jdbc:postgresql://localhost:5432/CONTROLE_FACIL</property>
+            <property name="hibernate.connection.username">controle_facil</property>
+            <property name="hibernate.connection.password">cfEng2010</property>
+        </properties>
+    </persistence-unit>
+</persistence>
+
+Después es necesario modificar el archivo de configuración applicationContext.xml:
+
+Se le añade el xmlns:context : 'xmlns:context="http://www.springframework.org/schema/context"'
+
+Con este nuevo namespace, podemos hacer que se escaneen las clases en busca de componentes para usarlos, injectarlos en spring:
+<context:component-scan base-package="it.eng.controlefacil.mvc" />
+
+También ponemos el tag "<tx:annotation-driven />" para decir que habrán transacciones declaradas con annotations.
+
+Después añadiremos dos beans, un entityManagerFactory y un transactionManager para que spring gestione el ciclo de vida de éstos:
+    <bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalEntityManagerFactoryBean">
+        <property name="persistenceUnitName" value="controleFacilPU" />
+    </bean>
+
+    <bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+        <property name="entityManagerFactory" ref="entityManagerFactory" />
+    </bean>

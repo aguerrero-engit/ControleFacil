@@ -1,0 +1,68 @@
+table.tbl {
+    border-collapse: collapse;
+}
+
+th.tbl {
+    background-color:#069;
+    color:white;
+}
+td.tbl,th.tbl {
+    padding: 2px;
+}
+table.tbl, th.tbl, td.tbl {
+    border: 2px solid #069;
+}
+
+.title {
+    background-image: url(../images/top_titulo_eng.jpg);
+    background-repeat: no-repeat;
+    margin: 5px 5px 5px 5px;
+    width: 1024px;
+    height: 103px
+}
+
+BODY, .body {
+    margin-left: auto;
+    margin-right: auto;
+    width: 1024px;
+    color: #069;
+}
+
+.error, .mandatory.error {
+    background-color: #B22222;
+    color: #fff;
+    border: solid 2px orange;
+}
+
+.mandatory {
+    background-color: #DD0;
+}
+
+.invalid {
+    font-size:65%;
+    color:red;
+    display: none;
+}
+/* Login boxes styles */
+#login_box {
+    height: 120px;
+    width: 250px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#left_navbar {
+    text-align:left;
+    float: left;
+    display: inline;
+    width: 64%;
+    margin: 5px 5px 5px 5px;
+}
+
+#right_navbar {
+    text-align:right;
+    float: right;
+    display: inline;
+    width: 34%;
+    margin: 5px 5px 5px 5px;
+}
